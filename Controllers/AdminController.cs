@@ -1,5 +1,3 @@
-using MentorMatch.Data;
-using MentorMatch.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
@@ -119,7 +117,7 @@ public class AdminController(
         {
             await userManager.AddToRoleAsync(newUser, role.ToString());
             
-            // Mark whitelist as used if it exists
+            // flagging invite as redeemed
             var whitelistEntry = await context.PredefinedEmails.FirstOrDefaultAsync(e => e.Email == email);
             if (whitelistEntry != null)
             {
@@ -152,7 +150,7 @@ public class AdminController(
             return RedirectToAction(nameof(Users));
         }
 
-        // Handle Students
+        // cleaning up student data
         if (user.UserType == UserType.Student)
         {
             var studentProposals = await context.Proposals
@@ -169,14 +167,14 @@ public class AdminController(
             context.Proposals.RemoveRange(studentProposals);
         }
 
-        // Handle Supervisors
+        // resetting supervisor state
         if (user.UserType == UserType.Supervisor)
         {
             // Expertise Tags
             var expertiseTags = await context.UserTags.Where(ut => ut.UserId == id).ToListAsync();
             context.UserTags.RemoveRange(expertiseTags);
 
-            // Revert Matches back to Pending
+            // putting projects back to pending
             var supervisorMatches = await context.Matches
                 .Include(m => m.Proposal)
                 .Where(m => m.SupervisorId == id)
@@ -192,11 +190,12 @@ public class AdminController(
             }
         }
 
-        /
+        // removing alerts
+
         var notifications = await context.Notifications.Where(n => n.UserId == id).ToListAsync();
         context.Notifications.RemoveRange(notifications);
 
-        // delete the user
+        // final account deletion
         var result = await userManager.DeleteAsync(user);
         if (result.Succeeded)
         {
@@ -279,14 +278,14 @@ public class AdminController(
             var proposal = match.Proposal;
             proposal.Status = ProposalStatus.Pending;
             
-            // Notify Student
+            // alerting student
             context.Notifications.Add(new Notification 
             { 
                 UserId = proposal.StudentId, 
                 Message = $"ADMIN ALERT: Your match for '{proposal.Title}' has been unassigned by an administrator. Status returned to pending." 
             });
 
-            // Notify Supervisor
+            // alerting supervisor
             context.Notifications.Add(new Notification 
             { 
                 UserId = match.SupervisorId, 

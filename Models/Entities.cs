@@ -97,6 +97,8 @@ public class Notification
     [Required]
     public string UserId { get; set; } = string.Empty;
     public virtual ApplicationUser User { get; set; } = null!;
+    public string Title { get; set; }
+    public string? LinkUrl { get; set; }
 
     [Required]
     public string Message { get; set; } = string.Empty;

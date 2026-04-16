@@ -69,14 +69,27 @@
                             }
                         }
                     </ul>
-                    
 
-                        <button id="theme-toggle" class="btn btn-link nav-link p-2 me-2" title="Toggle Theme">
-                            <i class="bi bi-moon-stars fs-5" id="theme-icon"></i>
-                        </button>
+                    @if (User.Identity?.IsAuthenticated == true)
+                    {
+                        <div class="nav-item dropdown d-flex align-items-center me-3">
+                            <a class="nav-link position-relative" href="#" id="notificationDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                <i class="bi bi-bell-fill fs-5"></i>
+                                <span id="notificationBadge" class="position-absolute top-25 start-75 translate-middle badge rounded-pill bg-danger d-none" style="font-size: 0.65rem;">
+                                    0
+                                </span>
+                            </a>
+                            <ul class="dropdown-menu dropdown-menu-end shadow border-white border-opacity-10 glass-card" aria-labelledby="notificationDropdown" id="notificationList" style="width: 320px; max-height: 400px; overflow-y: auto;">
+                                <li><span class="dropdown-item text-muted text-center small">Loading...</span></li>
+                            </ul>
+                        </div>
+                    }
 
-                        <partial name="_LoginPartial" />
-                    </div>
+                    <button id="theme-toggle" class="btn btn-link nav-link p-2 me-2" title="Toggle Theme">
+                        <i class="bi bi-moon-stars fs-5" id="theme-icon"></i>
+                    </button>
+
+                    <partial name="_LoginPartial" />
                 </div>
             </div>
         </nav>
@@ -102,6 +115,84 @@
     <script src="~/lib/jquery/dist/jquery.min.js"></script>
     <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
     <script src="~/js/site.js" asp-append-version="true"></script>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+        if (document.getElementById('notificationBadge')) {
+        fetchNotifications();
+        setInterval(fetchNotifications, 30000);
+        }
+        });
+
+        function fetchNotifications() {
+        fetch('/api/notifications')
+        .then(response => {
+        if (!response.ok) throw new Error('Not logged in or error');
+        return response.json();
+        })
+        .then(data => {
+        const badge = document.getElementById('notificationBadge');
+        const list = document.getElementById('notificationList');
+                    
+        list.innerHTML = '';
+
+        if (data.length === 0) {
+        badge.classList.add('d-none');
+        list.innerHTML = '<li><span class="dropdown-item text-muted text-center small py-3">No notifications yet</span></li>';
+        return;
+        }
+
+        // 1. Calculate the unread count locally to control the red badge
+        const unreadCount = data.filter(n => !n.isRead).length;
+
+        if (unreadCount === 0) {
+        badge.classList.add('d-none');
+        } else {
+        badge.innerText = unreadCount;
+        badge.classList.remove('d-none');
+        }
+
+        // 2. Build the Header (Only show 'Mark all read' if there are unread items)
+        list.innerHTML = `
+        <li>
+        <div class="d-flex justify-content-between align-items-center px-3 py-2 border-bottom border-white border-opacity-10">
+        <span class="fw-bold small text-success">Notifications</span>
+        ${unreadCount > 0
+        ? '<button class="btn btn-sm btn-link text-decoration-none small p-0" onclick="markAllRead()">Mark all read</button>'
+        : '<span class="small text-muted">All caught up</span>'}
+        </div>
+        </li>
+        `;
+
+        // 3. Build the list, keeping read ones visible but styling them differently
+        data.forEach(n => {
+        const bgHighlight = n.isRead ? '' : 'bg-success bg-opacity-10';
+        const newBadge = n.isRead ? '' : '<span class="badge bg-success ms-2" style="font-size: 0.6rem;">NEW</span>';
+
+        list.innerHTML += `
+        <li>
+        <a class="dropdown-item py-3 text-wrap border-bottom border-white border-opacity-10 ${bgHighlight}" href="${n.linkUrl || '#'}">
+        <div class="d-flex align-items-center mb-1">
+        <small class="d-block fw-bold text-white">${n.title}</small>
+        ${newBadge}
+        </div>
+        <span class="small text-white-50">${n.message}</span>
+        </a>
+        </li>
+        `;
+        });
+        })
+        .catch(error => console.log("Silent fail - likely not logged in."));
+        }
+
+        function markAllRead() {
+        fetch('/api/notifications/mark-read', { method: 'POST' })
+        .then(() => {
+        // Just re-fetch! The logic above will see 0 unread, hide the badge, and strip the green highlights.
+        fetchNotifications();
+        });
+        }
+    </script>
     @await RenderSectionAsync("Scripts", required: false)
 </body>
 </html>

@@ -21,9 +21,18 @@ public class NotificationsController(
         if (user == null) return Unauthorized();
 
         var notifications = await context.Notifications
-            .Where(n => n.UserId == user.Id && !n.IsRead)
+            .Where(n => n.UserId == user.Id)
             .OrderByDescending(n => n.Timestamp)
             .Take(10)
+            .Select(n => new
+            {
+                n.Id,
+                n.Title,
+                n.Message,
+                n.LinkUrl,
+                n.Timestamp,
+                n.IsRead
+            })
             .ToListAsync();
 
         return Ok(notifications);
